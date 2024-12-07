@@ -13,12 +13,13 @@
 # limitations under the License.
 
 from ast import literal_eval
-from typing import List
+from typing import List, Final, Literal, Union, Optional, Tuple
 
 from rosidl_parser.definition import AbstractGenericString
 from rosidl_parser.definition import AbstractNestedType
 from rosidl_parser.definition import AbstractSequence
 from rosidl_parser.definition import AbstractString
+from rosidl_parser.definition import AbstractType
 from rosidl_parser.definition import AbstractWString
 from rosidl_parser.definition import Array
 from rosidl_parser.definition import BasicType
@@ -26,10 +27,12 @@ from rosidl_parser.definition import BoundedSequence
 from rosidl_parser.definition import FLOATING_POINT_TYPES
 from rosidl_parser.definition import NamespacedType
 from rosidl_parser.definition import UnboundedSequence
+from rosidl_parser.definition import ValueType
+from rosidl_parser.definition import Message
 from rosidl_pycommon import generate_files
 
 
-def generate_cpp(generator_arguments_file) -> List[str]:
+def generate_cpp(generator_arguments_file: str) -> List[str]:
     mapping = {
         'idl.hpp.em': '%s.hpp',
         'idl__builder.hpp.em': 'detail/%s__builder.hpp',
@@ -53,7 +56,7 @@ def prefix_with_bom_if_necessary(content: str) -> str:
     return content
 
 
-MSG_TYPE_TO_CPP = {
+MSG_TYPE_TO_CPP: Final = {
     'boolean': 'bool',
     'octet': 'unsigned char',  # TODO change to std::byte with C++17
     'char': 'unsigned char',
@@ -76,7 +79,7 @@ MSG_TYPE_TO_CPP = {
 }
 
 
-def msg_type_only_to_cpp(type_):
+def msg_type_only_to_cpp(type_: AbstractType) -> str:
     """
     Convert a message type into the C++ declaration, ignoring array types.
 
@@ -103,7 +106,7 @@ def msg_type_only_to_cpp(type_):
     return cpp_type
 
 
-def msg_type_to_cpp(type_):
+def msg_type_to_cpp(type_: AbstractType) -> str:
     """
     Convert a message type into the C++ declaration, along with the array type.
 
@@ -134,7 +137,7 @@ def msg_type_to_cpp(type_):
         return cpp_type
 
 
-def value_to_cpp(type_, value):
+def value_to_cpp(type_: AbstractType, value: ValueType) -> str:
     """
     Convert a python value into a string representing that value in C++.
 
@@ -156,6 +159,7 @@ def value_to_cpp(type_, value):
 
     cpp_values = []
     is_string_array = isinstance(type_.value_type, AbstractGenericString)
+    assert isinstance(value, (dict, str))
     for single_value in value:
         cpp_value = primitive_value_to_cpp(type_.value_type, single_value)
         if is_string_array:
@@ -171,7 +175,7 @@ def value_to_cpp(type_, value):
     return cpp_value
 
 
-def primitive_value_to_cpp(type_, value):
+def primitive_value_to_cpp(type_: AbstractType, value: ValueType) -> str:
     """
     Convert a python value into a string representing that value in C++.
 
@@ -183,14 +187,16 @@ def primitive_value_to_cpp(type_, value):
     @type value: python builtin (bool, int, float or str)
     @returns: a string containing the C++ representation of the value
     """
-    assert isinstance(type_, (BasicType, AbstractGenericString)), \
+    assert isinstance(type_, (BasicType, AbstractString, AbstractWString)), \
         "Could not convert non-primitive type '%s' to CPP" % (type_)
     assert value is not None, "Value for type '%s' must not be None" % (type_)
 
     if isinstance(type_, AbstractString):
+        assert isinstance(value, str)
         return '"%s"' % escape_string(value)
 
     if isinstance(type_, AbstractWString):
+        assert isinstance(value, str)
         return 'u"%s"' % escape_wstring(value)
 
     if type_.typename == 'boolean':
@@ -210,6 +216,7 @@ def primitive_value_to_cpp(type_, value):
         # Handle edge case for INT32_MIN
         # Specifically, MSVC is not happy in this case
         if -2147483648 == value:
+            assert isinstance(value, int)
             return '({0}l - 1)'.format(value + 1)
         return '%sl' % value
 
@@ -220,6 +227,7 @@ def primitive_value_to_cpp(type_, value):
         # Handle edge case for INT64_MIN
         # See https://en.cppreference.com/w/cpp/language/integer_literal
         if -9223372036854775808 == value:
+            assert isinstance(value, int)
             return '(%sll - 1)' % (value + 1)
         return '%sll' % value
 
@@ -232,7 +240,7 @@ def primitive_value_to_cpp(type_, value):
     assert False, "unknown primitive type '%s'" % type_.typename
 
 
-def default_value_from_type(type_):
+def default_value_from_type(type_: AbstractType) -> Union[float, Literal['', False, 0]]:
     if isinstance(type_, AbstractGenericString):
         return ''
     elif isinstance(type_, BasicType) and type_.typename in FLOATING_POINT_TYPES:
@@ -242,49 +250,50 @@ def default_value_from_type(type_):
     return 0
 
 
-def escape_string(s):
+def escape_string(s: str) -> str:
     s = s.replace('\\', '\\\\')
     s = s.replace('"', '\\"')
     return s
 
 
-def escape_wstring(s):
+def escape_wstring(s: str) -> str:
     return escape_string(s)
 
 
-def create_init_alloc_and_member_lists(message):
-    # A Member object represents the information we need to know to initialize
-    # a single member of the class.
-    class Member:
+# A Member object represents the information we need to know to initialize
+# a single member of the class.
+class Member:
 
-        def __init__(self, name):
-            self.name = name
-            self.default_value = None
-            self.zero_value = None
-            self.zero_need_array_override = False
-            self.type = None
-            self.num_prealloc = 0
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.default_value: Union[List[str], str, None] = None
+        self.zero_value: Union[List[str], str, None] = None
+        self.zero_need_array_override = False
+        self.type: Optional[AbstractType] = None
+        self.num_prealloc = 0
 
-        def same_default_and_zero_value(self, other):
-            return self.default_value == other.default_value and \
-                self.zero_value == other.zero_value
+    def same_default_and_zero_value(self, other: 'Member') -> bool:
+        return self.default_value == other.default_value and \
+            self.zero_value == other.zero_value
 
-    # A CommonMemberSet is a set of adjacent members that share the same set of
-    # initialization semantics.  Here, initialization semantics mean that all
-    # members of the set have a default value (or do not have a default value),
-    # and all members of the set have a zero value (or do not have a zero
-    # value).
-    class CommonMemberSet:
+# A CommonMemberSet is a set of adjacent members that share the same set of
+# initialization semantics.  Here, initialization semantics mean that all
+# members of the set have a default value (or do not have a default value),
+# and all members of the set have a zero value (or do not have a zero
+# value).
+class CommonMemberSet:
 
-        def __init__(self):
-            self.members = []
+    def __init__(self) -> None:
+        self.members: List[Member] = []
 
-        def add_member(self, member):
-            if not self.members or self.members[-1].same_default_and_zero_value(member):
-                self.members.append(member)
-                return True
-            return False
+    def add_member(self, member: Member) -> bool:
+        if not self.members or self.members[-1].same_default_and_zero_value(member):
+            self.members.append(member)
+            return True
+        return False
 
+
+def create_init_alloc_and_member_lists(message: Message) -> Tuple[List[str], List[str], List[CommonMemberSet]]:
     # The loop below is used to generate three different lists:
     #   init_list - The list of member variables that we will initialize using member
     #               initialization in the default constructor
@@ -292,9 +301,9 @@ def create_init_alloc_and_member_lists(message):
     #                initializion in the allocator constructor
     #   member_list - The list of members that we will generate initialization code
     #                 for in the body of the constructors
-    init_list = []
-    alloc_list = []
-    member_list = []
+    init_list: List[str] = []
+    alloc_list: List[str] = []
+    member_list: List[CommonMemberSet] = []
     for field in message.structure.members:
         member = Member(field.name)
         member.type = field.type
@@ -306,8 +315,11 @@ def create_init_alloc_and_member_lists(message):
                 single = primitive_value_to_cpp(field.type.value_type, default)
                 member.zero_value = [single] * field.type.size
                 if field.has_annotation('default'):
-                    default_value = literal_eval(
-                        field.get_annotation_value('default')['value'])
+                    default_annotation = field.get_annotation_value('default')
+                    assert isinstance(default_annotation, dict)
+                    default_annotation_value_str = default_annotation['value']
+                    assert isinstance(default_annotation_value_str, str)
+                    default_value = literal_eval(default_annotation_value_str)
                     member.default_value = []
                     for val in default_value:
                         member.default_value.append(
@@ -317,8 +329,11 @@ def create_init_alloc_and_member_lists(message):
                 member.zero_need_array_override = True
         elif isinstance(field.type, AbstractSequence):
             if field.has_annotation('default'):
-                default_value = literal_eval(
-                    field.get_annotation_value('default')['value'])
+                default_annotation = field.get_annotation_value('default')
+                assert isinstance(default_annotation, dict)
+                default_annotation_value_str = default_annotation['value']
+                assert isinstance(default_annotation_value_str, str)
+                default_value = literal_eval(default_annotation_value_str)
                 member.default_value = value_to_cpp(field.type, default_value)
                 member.num_prealloc = len(default_value)
         else:
@@ -329,9 +344,11 @@ def create_init_alloc_and_member_lists(message):
                 default = default_value_from_type(field.type)
                 member.zero_value = primitive_value_to_cpp(field.type, default)
                 if field.has_annotation('default'):
+                    default_annotation = field.get_annotation_value('default')
+                    assert isinstance(default_annotation, dict)
                     member.default_value = primitive_value_to_cpp(
                         field.type,
-                        field.get_annotation_value('default')['value'])
+                        default_annotation['value'])
             else:
                 init_list.append(field.name + '(_init)')
                 alloc_list.append(field.name + '(_alloc, _init)')

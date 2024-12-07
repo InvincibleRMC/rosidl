@@ -14,6 +14,8 @@
 
 import pathlib
 
+from typing import List
+
 from ament_index_python import get_package_share_directory
 
 from rosidl_cli.command.generate.extensions import GenerateCommandExtension
@@ -29,11 +31,11 @@ class GenerateIntrospectionCTypesupport(GenerateCommandExtension):
 
     def generate(
         self,
-        package_name,
-        interface_files,
-        include_paths,
-        output_path
-    ):
+        package_name: str,
+        interface_files: List[str],
+        include_paths: List[str],
+        output_path: pathlib.Path
+    ) -> List[str]:
         generated_files = []
 
         package_share_path = pathlib.Path(

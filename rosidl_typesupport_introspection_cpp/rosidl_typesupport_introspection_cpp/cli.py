@@ -29,10 +29,10 @@ class GenerateIntrospectionCppTypesupport(GenerateCommandExtension):
 
     def generate(
         self,
-        package_name,
-        interface_files,
-        include_paths,
-        output_path
+        package_name: str,
+        interface_files: List[str],
+        include_paths: List[str],
+        output_path: pathlib.Path
     ) -> List[str]:
         package_share_path = pathlib.Path(
             get_package_share_directory('rosidl_typesupport_introspection_cpp'))

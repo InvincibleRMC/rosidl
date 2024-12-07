@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
+from pathlib import Path
+from typing import List, Final, Optional
 
 from rosidl_generator_type_description import parse_rihs_string
 from rosidl_generator_type_description import RIHS01_HASH_VALUE_SIZE
@@ -26,11 +27,14 @@ from rosidl_parser.definition import BasicType
 from rosidl_parser.definition import CHARACTER_TYPES
 from rosidl_parser.definition import NamespacedType
 from rosidl_parser.definition import OCTET_TYPE
+from rosidl_parser.definition import Type
+from rosidl_parser.definition import ValueType
 from rosidl_pycommon import convert_camel_case_to_lower_case_underscore
 from rosidl_pycommon import generate_files
 
 
-def generate_c(generator_arguments_file, disable_description_codegen: bool = False) -> List[str]:
+def generate_c(generator_arguments_file: str,
+               disable_description_codegen: bool = False) -> List[str]:
     mapping = {
         'idl.h.em': '%s.h',
         'idl__description.c.em': 'detail/%s__description.c',
@@ -59,7 +63,7 @@ def prefix_with_bom_if_necessary(content: str) -> str:
     return content
 
 
-BASIC_IDL_TYPES_TO_C = {
+BASIC_IDL_TYPES_TO_C: Final = {
     'float': 'float',
     'double': 'double',
     'long double': 'long double',
@@ -78,7 +82,8 @@ BASIC_IDL_TYPES_TO_C = {
 }
 
 
-def idl_structure_type_to_c_include_prefix(namespaced_type, subdirectory=None):
+def idl_structure_type_to_c_include_prefix(namespaced_type: NamespacedType,
+                                           subdirectory: Optional[str] = None) -> str:
     parts = [
         convert_camel_case_to_lower_case_underscore(x)
         for x in (namespaced_type.namespaced_name())]
@@ -103,20 +108,20 @@ def idl_structure_type_to_c_include_prefix(namespaced_type, subdirectory=None):
     return include_prefix
 
 
-def idl_structure_type_to_c_typename(namespaced_type):
+def idl_structure_type_to_c_typename(namespaced_type: NamespacedType) -> str:
     return '__'.join(namespaced_type.namespaced_name())
 
 
-def idl_structure_type_sequence_to_c_typename(namespaced_type):
+def idl_structure_type_sequence_to_c_typename(namespaced_type: NamespacedType) -> str:
     return idl_structure_type_to_c_typename(namespaced_type) + '__Sequence'
 
 
-def interface_path_to_string(interface_path):
+def interface_path_to_string(interface_path: Path) -> str:
     return '/'.join(
         list(interface_path.parents[0].parts) + [interface_path.stem])
 
 
-def idl_declaration_to_c(type_, name):
+def idl_declaration_to_c(type_: AbstractType, name: str) -> str:
     """
     Convert an IDL type into the C declaration.
 
@@ -135,7 +140,7 @@ def idl_declaration_to_c(type_, name):
     return idl_type_to_c(type_) + ' ' + name
 
 
-def idl_type_to_c(type_):
+def idl_type_to_c(type_: AbstractType) -> str:
     if isinstance(type_, Array):
         assert False, 'The array size is part of the variable'
     if isinstance(type_, AbstractSequence):
@@ -148,7 +153,7 @@ def idl_type_to_c(type_):
     return basetype_to_c(type_)
 
 
-def basetype_to_c(basetype):
+def basetype_to_c(basetype: AbstractType) -> str:
     if isinstance(basetype, BasicType):
         return BASIC_IDL_TYPES_TO_C[basetype.typename]
     if isinstance(basetype, AbstractString):
@@ -160,23 +165,23 @@ def basetype_to_c(basetype):
     assert False, str(basetype)
 
 
-def value_to_c(type_, value):
+def value_to_c(type_: AbstractType, value: ValueType) -> str:
     assert isinstance(type_, AbstractType)
     assert value is not None
 
     if isinstance(type_, AbstractString):
+        assert isinstance(value, str)
         return '"%s"' % escape_string(value)
 
     if isinstance(type_, AbstractWString):
+        assert isinstance(value, str)
         return 'u"%s"' % escape_wstring(value)
 
+    assert isinstance(type_, BasicType)
     return basic_value_to_c(type_, value)
 
 
-def basic_value_to_c(type_, value):
-    assert isinstance(type_, BasicType)
-    assert value is not None
-
+def basic_value_to_c(type_: BasicType, value: ValueType) -> str:
     if 'boolean' == type_.typename:
         return 'true' if value else 'false'
 
@@ -191,6 +196,7 @@ def basic_value_to_c(type_, value):
         return str(value)
 
     if type_.typename == 'int32':
+        assert isinstance(value, int)
         # Handle edge case for INT32_MIN
         # Specifically, MSVC is not happy in this case
         if -2147483648 == value:
@@ -201,6 +207,7 @@ def basic_value_to_c(type_, value):
         return f'{value}ul'
 
     if type_.typename == 'int64':
+        assert isinstance(value, int)
         # Handle edge case for INT64_MIN
         # See https://en.cppreference.com/w/cpp/language/integer_literal
         if -9223372036854775808 == value:
@@ -219,17 +226,17 @@ def basic_value_to_c(type_, value):
     assert False, "unknown basic type '%s'" % type_
 
 
-def escape_string(s):
+def escape_string(s: str) -> str:
     s = s.replace('\\', '\\\\')
     s = s.replace('"', r'\"')
     return s
 
 
-def escape_wstring(s):
+def escape_wstring(s: str) -> str:
     return escape_string(s)
 
 
-def type_hash_to_c_definition(hash_string, *, indent=2):
+def type_hash_to_c_definition(hash_string: str, *, indent: int = 2) -> str:
     """Generate empy for rosidl_type_hash_t instance with 8 bytes per line for readability."""
     bytes_per_row = 8
     rows = 4

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import pathlib
+from typing import List
 
 from ament_index_python import get_package_share_directory
 from rosidl_cli.command.generate.extensions import GenerateCommandExtension
@@ -27,12 +28,12 @@ class GenerateC(GenerateCommandExtension):
 
     def generate(
         self,
-        package_name,
-        interface_files,
-        include_paths,
-        output_path
-    ):
-        generated_files = []
+        package_name: str,
+        interface_files: List[str],
+        include_paths: List[str],
+        output_path: pathlib.Path
+    ) -> List[str]:
+        generated_files: List[str] = []
 
         package_share_path = \
             pathlib.Path(get_package_share_directory('rosidl_generator_c'))
