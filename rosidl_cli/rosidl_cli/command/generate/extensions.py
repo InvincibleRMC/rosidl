@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from pathlib import Path
-from typing import cast, List, Optional
+from typing import cast, List, Optional, Union
 
 from rosidl_cli.extensions import Extension
 from rosidl_cli.extensions import load_extensions
@@ -33,7 +33,7 @@ class GenerateCommandExtension(Extension):
         interface_files: List[str],
         include_paths: List[str],
         output_path: Path
-    ) -> List[str]:
+    ) -> List[Union[str, Path]]:
         """
         Generate source code.
 

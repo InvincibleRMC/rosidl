@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from ast import literal_eval
-from typing import List, Final, Literal, Union, Optional, Tuple
+from typing import Final, List, Literal, Optional, Tuple, Union
 
 from rosidl_parser.definition import AbstractGenericString
 from rosidl_parser.definition import AbstractNestedType
@@ -25,10 +25,10 @@ from rosidl_parser.definition import Array
 from rosidl_parser.definition import BasicType
 from rosidl_parser.definition import BoundedSequence
 from rosidl_parser.definition import FLOATING_POINT_TYPES
+from rosidl_parser.definition import Message
 from rosidl_parser.definition import NamespacedType
 from rosidl_parser.definition import UnboundedSequence
 from rosidl_parser.definition import ValueType
-from rosidl_parser.definition import Message
 from rosidl_pycommon import generate_files
 
 
@@ -276,6 +276,7 @@ class Member:
         return self.default_value == other.default_value and \
             self.zero_value == other.zero_value
 
+
 # A CommonMemberSet is a set of adjacent members that share the same set of
 # initialization semantics.  Here, initialization semantics mean that all
 # members of the set have a default value (or do not have a default value),
@@ -293,7 +294,9 @@ class CommonMemberSet:
         return False
 
 
-def create_init_alloc_and_member_lists(message: Message) -> Tuple[List[str], List[str], List[CommonMemberSet]]:
+def create_init_alloc_and_member_lists(message: Message) -> Tuple[List[str],
+                                                                  List[str],
+                                                                  List[CommonMemberSet]]:
     # The loop below is used to generate three different lists:
     #   init_list - The list of member variables that we will initialize using member
     #               initialization in the default constructor

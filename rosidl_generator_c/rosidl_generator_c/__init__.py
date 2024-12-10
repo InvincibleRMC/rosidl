@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from pathlib import Path
-from typing import List, Final, Optional
+from typing import Final, List, Optional
 
 from rosidl_generator_type_description import parse_rihs_string
 from rosidl_generator_type_description import RIHS01_HASH_VALUE_SIZE
@@ -27,7 +27,6 @@ from rosidl_parser.definition import BasicType
 from rosidl_parser.definition import CHARACTER_TYPES
 from rosidl_parser.definition import NamespacedType
 from rosidl_parser.definition import OCTET_TYPE
-from rosidl_parser.definition import Type
 from rosidl_parser.definition import ValueType
 from rosidl_pycommon import convert_camel_case_to_lower_case_underscore
 from rosidl_pycommon import generate_files
