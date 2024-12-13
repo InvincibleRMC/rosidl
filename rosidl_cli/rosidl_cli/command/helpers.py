@@ -17,7 +17,7 @@ import json
 import os
 import pathlib
 import tempfile
-from typing import Generator, List, Tuple
+from typing import Generator, List, Tuple, Union
 
 
 def package_name_from_interface_file_path(path: pathlib.Path) -> str:
@@ -142,8 +142,8 @@ def legacy_generator_arguments_file(
 def generate_visibility_control_file(
     *,
     package_name: str,
-    template_path: str,
-    output_path: str
+    template_path: Union[str, pathlib.Path],
+    output_path: Union[str, pathlib.Path]
 ) -> None:
     """
     Generate a visibility control file from a template.
