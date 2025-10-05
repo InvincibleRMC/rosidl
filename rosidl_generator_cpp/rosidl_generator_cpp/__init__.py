@@ -19,11 +19,13 @@ from rosidl_parser.definition import AbstractGenericString
 from rosidl_parser.definition import AbstractNestedType
 from rosidl_parser.definition import AbstractSequence
 from rosidl_parser.definition import AbstractString
+from rosidl_parser.definition import AbstractType
 from rosidl_parser.definition import AbstractWString
 from rosidl_parser.definition import Array
 from rosidl_parser.definition import BasicType
 from rosidl_parser.definition import BoundedSequence
 from rosidl_parser.definition import FLOATING_POINT_TYPES
+from rosidl_parser.definition import Member
 from rosidl_parser.definition import NamespacedType
 from rosidl_parser.definition import UnboundedSequence
 from rosidl_pycommon import generate_files
@@ -103,7 +105,16 @@ def msg_type_only_to_cpp(type_):
     return cpp_type
 
 
-def msg_type_to_cpp(type_):
+def member_to_cpp(member: Member) -> str:
+
+    msg_type = msg_type_to_cpp(member.type)
+
+    if member.has_annotation('@optional'):
+        return f'std::optional<{msg_type}>'
+    return msg_type
+
+
+def msg_type_to_cpp(type_: AbstractType) -> str:
     """
     Convert a message type into the C++ declaration, along with the array type.
 
@@ -185,7 +196,9 @@ def primitive_value_to_cpp(type_, value):
     """
     assert isinstance(type_, (BasicType, AbstractGenericString)), \
         "Could not convert non-primitive type '%s' to CPP" % (type_)
-    assert value is not None, "Value for type '%s' must not be None" % (type_)
+
+    if value is None:
+        return 'std::nullopt'
 
     if isinstance(type_, AbstractString):
         return '"%s"' % escape_string(value)
@@ -246,13 +259,13 @@ def default_value_from_type(type_):
     return 0
 
 
-def escape_string(s):
+def escape_string(s: str) -> str:
     s = s.replace('\\', '\\\\')
     s = s.replace('"', '\\"')
     return s
 
 
-def escape_wstring(s):
+def escape_wstring(s: str) -> str:
     return escape_string(s)
 
 
